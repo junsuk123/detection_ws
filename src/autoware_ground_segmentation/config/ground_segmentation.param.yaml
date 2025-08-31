@@ -1,0 +1,29 @@
+/**:
+  ros__parameters:
+    common_ground_filter:
+      plugin: "autoware::ground_segmentation::ScanGroundFilterComponent"
+      parameters:
+        # --- Scan mode 고정 ---
+        elevation_grid_mode: false
+        use_virtual_ground_point: false
+
+        # --- Indoor flat floor (링 제거 강화) ---
+        global_slope_max_angle_deg: 5.0     # 멀리서 완만한 경사까지 지면 유지
+        local_slope_max_angle_deg: 5.0
+        split_points_distance_tolerance: 3.5  # 드랍/간격 커도 지면으로 연결
+        split_height_distance: 0.2            # 높이 단차 허용
+        non_ground_height_threshold: 0.2      # 지면 모델 대비 z오차 허용
+        radial_divider_angle_deg: 0.75          # 레이 분해능 소폭↑(링 잔상 완화)
+
+        # --- 기타(Scan 모드 영향 적음) ---
+        grid_size_m: 1.0
+        grid_mode_switch_radius: 50.0
+        gnd_grid_buffer_size: 2
+        detection_range_z_max: 20.0
+        low_priority_region_x: -20.0
+        center_pcl_shift: 0.0
+        use_recheck_ground_cluster: true
+        use_lowest_point: true
+
+        # --- Debug ---
+        publish_processing_time_detail: false

@@ -1,0 +1,24 @@
+/**:
+    ros__parameters:
+      video_device: "/dev/v4l/by-id/usb-046d_C922_Pro_Stream_Webcam_E1AF94DF-video-index0"
+      framerate: 15.0
+      io_method: "mmap"
+      frame_id: "camera4"
+      pixel_format: "mjpeg2rgb"
+      av_device_format: "YUV422P"
+      image_width: 640
+      image_height: 480
+      camera_name: "C92-Pink"
+      # reusing same camera intrinsics only for demo, should really be unique for camera2"
+      camera_info_url: "package://usb_cam/config/camera_info4.yaml"
+      brightness: -1
+      contrast: -1
+      saturation: -1
+      sharpness: -1
+      gain: -1
+      auto_white_balance: true
+      white_balance: 4000
+      autoexposure: true
+      exposure: 100
+      autofocus: false
+      focus: -1

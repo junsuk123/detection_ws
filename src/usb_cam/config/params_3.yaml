@@ -1,0 +1,24 @@
+/**:
+    ros__parameters:
+      video_device: "/dev/v4l/by-id/usb-046d_Logitech_Webcam_C930e_82DD28FE-video-index0"
+      framerate: 15.0
+      io_method: "mmap"
+      frame_id: "camera3"
+      pixel_format: "mjpeg2rgb"
+      av_device_format: "YUV422P"
+      image_width: 640
+      image_height: 480
+      camera_name: "C93-Orange"
+      # reusing same camera intrinsics only for demo, should really be unique for camera2"
+      camera_info_url: "package://usb_cam/config/camera_info3.yaml"
+      brightness: -1
+      contrast: -1
+      saturation: -1
+      sharpness: -1
+      gain: -1
+      auto_white_balance: true
+      white_balance: 4000
+      autoexposure: true
+      exposure: 100
+      autofocus: false
+      focus: -1

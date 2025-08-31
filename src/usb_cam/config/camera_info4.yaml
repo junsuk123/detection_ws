@@ -1,0 +1,26 @@
+image_width: 640
+image_height: 480
+camera_name: C92-Pink
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: [652.93497,   0.     , 304.26394,
+           0.     , 653.05883, 247.66673,
+           0.     ,   0.     ,   1.     ]
+distortion_model: plumb_bob
+distortion_coefficients:
+  rows: 1
+  cols: 5
+  data: [0.031254, -0.184266, 0.003887, -0.000334, 0.000000]
+rectification_matrix:
+  rows: 3
+  cols: 3
+  data: [1., 0., 0.,
+         0., 1., 0.,
+         0., 0., 1.]
+projection_matrix:
+  rows: 3
+  cols: 4
+  data: [650.85803,   0.     , 303.64629,   0.     ,
+           0.     , 653.38654, 248.73963,   0.     ,
+           0.     ,   0.     ,   1.     ,   0.     ]

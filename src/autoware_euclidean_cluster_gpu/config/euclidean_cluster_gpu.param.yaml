@@ -1,0 +1,43 @@
+/**:
+  ros__parameters:
+    # ====== 입력/출력 토픽 ======
+    input: /pointcloud_nonground
+    output_clusters: /perception/clustered/points
+    output_boxes: /perception/clustered/boxes
+    output_clusters_only: /perception/clustered/points_only
+    output_markers: /perception/clustered/markers
+
+    # ====== 클러스터링 파라미터 ======
+    voxel_size: 0.00001         # 더 작은 voxel (ex: 0.03~0.07도 실험 가능)
+    tolerance: 0.1       # 더 작은 tolerance (ex: 0.15~0.22도 실험 가능)
+    min_cluster_size: 1     # 작은 클러스터도 검출 (ex: 10~20)
+    max_cluster_size: 500    # 콘이 200포인트라면 300~500 정도로 제한
+    max_iterations: 20
+    max_points: 2000000
+
+    # ====== ROI 파라미터 (관심영역) ======
+    roi_x_min: 0.0
+    roi_x_max: 2.0
+    roi_y_min: -1.5
+    roi_y_max: 1.5
+    roi_z_min: -0.5
+    roi_z_max: 1.5
+
+    # ====== 외부 config 호환 파라미터 ======
+    publish_debug_markers: true
+    publish_tracking_info: false
+
+    # ====== 시각화/출력 옵션 ======
+    publish_markers: true
+    publish_boxes: true
+    marker_decimation: 5
+    boxes_decimation: 5
+    track_match_dist: 0.5
+    publish_debug_markers: true
+    publish_tracking_info: false
+
+    # ====== 시각화/출력 옵션 ======
+    publish_markers: true
+    publish_boxes: true
+    marker_decimation: 5
+    boxes_decimation: 1

@@ -1,0 +1,26 @@
+image_width: 640
+image_height: 480
+camera_name: C92-Yellow
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: [603.82483,   0.     , 330.42303,
+           0.     , 603.21144, 230.97241,
+           0.     ,   0.     ,   1.     ]
+distortion_model: plumb_bob
+distortion_coefficients:
+  rows: 1
+  cols: 5
+  data: [0.075476, -0.169177, 0.001256, -0.001078, 0.000000]
+rectification_matrix:
+  rows: 3
+  cols: 3
+  data: [1., 0., 0.,
+         0., 1., 0.,
+         0., 0., 1.]
+projection_matrix:
+  rows: 3
+  cols: 4
+  data: [608.68405,   0.     , 329.99607,   0.     ,
+           0.     , 608.69118, 231.37457,   0.     ,
+           0.     ,   0.     ,   1.     ,   0.     ]

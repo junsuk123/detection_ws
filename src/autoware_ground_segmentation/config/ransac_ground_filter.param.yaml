@@ -1,0 +1,15 @@
+/**:
+  ros__parameters:
+    base_frame: "base_link"
+    unit_axis: "z"
+    max_iterations: 200
+    min_trial: 100
+    min_points: 50
+    outlier_threshold: 0.15        # 15 cm
+    plane_slope_threshold: 15.0
+    voxel_size_x: 0.10
+    voxel_size_y: 0.10
+    voxel_size_z: 0.10
+    height_threshold: 0.20         # 20 cm
+    debug: true
+    publish_processing_time_detail: true

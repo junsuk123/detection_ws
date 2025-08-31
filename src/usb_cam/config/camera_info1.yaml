@@ -1,0 +1,26 @@
+image_width: 640
+image_height: 480
+camera_name: C93-Blue
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: [484.45878,   0.     , 291.5055 ,
+           0.     , 482.5031 , 222.66382,
+           0.     ,   0.     ,   1.     ]
+distortion_model: plumb_bob
+distortion_coefficients:
+  rows: 1
+  cols: 5
+  data: [0.162875, -0.287212, 0.000692, -0.000678, 0.000000]
+rectification_matrix:
+  rows: 3
+  cols: 3
+  data: [1., 0., 0.,
+         0., 1., 0.,
+         0., 0., 1.]
+projection_matrix:
+  rows: 3
+  cols: 4
+  data: [490.54593,   0.     , 288.48185,   0.     ,
+           0.     , 492.77573, 222.42638,   0.     ,
+           0.     ,   0.     ,   1.     ,   0.     ]
