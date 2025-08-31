@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "any": "cpp",
+        "filesystem": "cpp",
+        "functional": "cpp",
+        "limits": "cpp",
+        "__locale": "cpp",
+        "ios": "cpp"
+    }
+}

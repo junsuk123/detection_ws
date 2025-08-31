@@ -1,0 +1,203 @@
+
+// Apache-2.0
+#include <rclcpp/rclcpp.hpp>
+#include <sensor_msgs/msg/point_cloud2.hpp>
+#include <sensor_msgs/point_field_conversion.hpp>
+#include <vision_msgs/msg/detection3_d_array.hpp>
+#include <vision_msgs/msg/detection3_d.hpp>
+#include <geometry_msgs/msg/point.hpp>
+#include <geometry_msgs/msg/pose.hpp>
+#include <std_msgs/msg/header.hpp>
+#include <cuda_runtime.h>
+
+#include <vector>
+#include <string>
+#include <memory>
+#include <limits>
+#include <cmath>
+#include <unordered_map>
+
+#include "autoware/euclidean_cluster_gpu/euclidean_cluster_gpu.hpp"
+
+// helper from separate TU
+std::vector<int32_t> compress_and_filter_labels(
+  const std::vector<int32_t>& raw, int min_sz, int max_sz);
+
+namespace {
+
+struct PointXYZ {
+  float x, y, z;
+};
+
+bool read_xyz(const sensor_msgs::msg::PointCloud2& msg, std::vector<PointXYZ>& out) {
+  int x_off=-1,y_off=-1,z_off=-1;
+  for (auto& f : msg.fields) {
+    if (f.name == "x") x_off = f.offset;
+    else if (f.name == "y") y_off = f.offset;
+    else if (f.name == "z") z_off = f.offset;
+  }
+  if (x_off<0||y_off<0||z_off<0) return false;
+  out.resize(msg.width * msg.height);
+  const uint8_t* data = msg.data.data();
+  for (size_t i=0;i<out.size();++i) {
+    const uint8_t* p = data + i*msg.point_step;
+    float x = *reinterpret_cast<const float*>(p + x_off);
+    float y = *reinterpret_cast<const float*>(p + y_off);
+    float z = *reinterpret_cast<const float*>(p + z_off);
+    out[i] = {x,y,z};
+  }
+  return true;
+}
+
+sensor_msgs::msg::PointCloud2::SharedPtr add_cluster_id_field(
+  const sensor_msgs::msg::PointCloud2& in,
+  const std::vector<int32_t>& cluster_ids)
+{
+  auto out = std::make_shared<sensor_msgs::msg::PointCloud2>(in);
+  // append int32 cluster_id field
+  sensor_msgs::msg::PointField fld;
+  fld.name = "cluster_id";
+  fld.offset = in.point_step; // append at end
+  fld.datatype = sensor_msgs::msg::PointField::INT32;
+  fld.count = 1;
+  out->fields.push_back(fld);
+  out->point_step += 4;
+  out->row_step = out->width * out->point_step;
+  out->data.resize(out->row_step * out->height);
+
+  // copy original bytes then write ids
+  const size_t N = in.width * in.height;
+  for (size_t i=0;i<N;++i) {
+    // original already copied by constructor (since we started from 'in')
+    uint8_t* p = out->data.data() + i*out->point_step + in.point_step;
+    *reinterpret_cast<int32_t*>(p) = cluster_ids[i];
+  }
+  return out;
+}
+
+vision_msgs::msg::Detection3DArray::SharedPtr to_boxes(
+  const std_msgs::msg::Header& header,
+  const std::vector<PointXYZ>& pts,
+  const std::vector<int32_t>& ids)
+{
+  // compute simple AABB per cluster
+  std::unordered_map<int32_t, std::array<float,6>> aabbs; // minx,miny,minz,maxx,maxy,maxz
+  for (size_t i=0;i<ids.size();++i) {
+    int id = ids[i];
+    if (id < 0) continue;
+    auto& bb = aabbs[id];
+    if (bb[0] == 0 && bb[3] == 0 && false) {}
+    if (bb[0] == 0 && bb[3] == 0 && aabbs.size() == 0) {} // silence
+  }
+  for (size_t i=0;i<ids.size();++i) {
+    int id = ids[i];
+    if (id < 0) continue;
+    auto it = aabbs.find(id);
+    if (it == aabbs.end()) {
+      aabbs[id] = { pts[i].x, pts[i].y, pts[i].z, pts[i].x, pts[i].y, pts[i].z };
+    } else {
+      auto& b = it->second;
+      b[0] = std::min(b[0], pts[i].x);
+      b[1] = std::min(b[1], pts[i].y);
+      b[2] = std::min(b[2], pts[i].z);
+      b[3] = std::max(b[3], pts[i].x);
+      b[4] = std::max(b[4], pts[i].y);
+      b[5] = std::max(b[5], pts[i].z);
+    }
+  }
+
+  auto arr = std::make_shared<vision_msgs::msg::Detection3DArray>();
+  arr->header = header;
+  for (auto& kv : aabbs) {
+    const auto& b = kv.second;
+    auto det = vision_msgs::msg::Detection3D();
+    det.header = header;
+    det.bbox.size.x = (b[3]-b[0]);
+    det.bbox.size.y = (b[4]-b[1]);
+    det.bbox.size.z = (b[5]-b[2]);
+    det.bbox.center.position.x = (b[3]+b[0])*0.5;
+    det.bbox.center.position.y = (b[4]+b[1])*0.5;
+    det.bbox.center.position.z = (b[5]+b[2])*0.5;
+    arr->detections.push_back(det);
+  }
+  return arr;
+}
+
+} // anon
+
+class EuclideanClusterGpuNode : public rclcpp::Node {
+public:
+  EuclideanClusterGpuNode() : Node("euclidean_cluster_gpu") {
+    using std::placeholders::_1;
+    declare_parameter<std::string>("input", "/points_raw");
+    declare_parameter<std::string>("output_clusters", "~/clustered");
+    declare_parameter<std::string>("output_boxes", "~/boxes");
+    declare_parameter<double>("voxel_size", 0.3);
+    declare_parameter<double>("tolerance", 0.7);
+    declare_parameter<int>("min_cluster_size", 10);
+    declare_parameter<int>("max_cluster_size", 100000);
+    declare_parameter<int>("max_iterations", 10);
+
+    auto in_topic = get_parameter("input").as_string();
+    auto out_topic = get_parameter("output_clusters").as_string();
+    auto box_topic = get_parameter("output_boxes").as_string();
+
+    sub_ = create_subscription<sensor_msgs::msg::PointCloud2>(
+      in_topic, rclcpp::SensorDataQoS(),
+      std::bind(&EuclideanClusterGpuNode::onCloud, this, _1));
+
+    pub_cloud_ = create_publisher<sensor_msgs::msg::PointCloud2>(out_topic, 10);
+    pub_boxes_ = create_publisher<vision_msgs::msg::Detection3DArray>(box_topic, 10);
+
+    params_.voxel_size = (float)get_parameter("voxel_size").as_double();
+    params_.tolerance = (float)get_parameter("tolerance").as_double();
+    params_.min_cluster_size = get_parameter("min_cluster_size").as_int();
+    params_.max_cluster_size = get_parameter("max_cluster_size").as_int();
+    params_.max_iterations = get_parameter("max_iterations").as_int();
+
+    RCLCPP_INFO(get_logger(), "GPU clustering node started: vsize=%.2f tol=%.2f",
+      params_.voxel_size, params_.tolerance);
+  }
+
+private:
+  void onCloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
+    std::vector<PointXYZ> pts;
+    if (!read_xyz(*msg, pts)) {
+      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000, "PointCloud2 missing x/y/z fields");
+      return;
+    }
+    const int N = (int)pts.size();
+    if (N == 0) return;
+    if (N > params_.max_points) {
+      RCLCPP_WARN(get_logger(), "Too many points: %d > %d; truncating", N, params_.max_points);
+    }
+    int M = std::min(N, params_.max_points);
+
+    // Copy to device
+    std::vector<autoware::euclidean_cluster_gpu::Float3> host(M);
+    for (int i=0;i<M;++i) { host[i] = {pts[i].x, pts[i].y, pts[i].z}; }
+    std::vector<int32_t> compact = compress_and_filter_labels(
+      std::vector<int32_t>(h_labels.begin(), h_labels.end()),
+      params_.min_cluster_size, params_.max_cluster_size);
+
+    // Publish cloud with cluster_id
+    auto cloud_msg = add_cluster_id_field(*msg, compact);
+    pub_cloud_->publish(*cloud_msg);
+
+    // Publish simple AABB boxes
+    auto boxes = to_boxes(msg->header, pts, compact);
+    pub_boxes_->publish(*boxes);
+  }
+
+  rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sub_;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_cloud_;
+  rclcpp::Publisher<vision_msgs::msg::Detection3DArray>::SharedPtr pub_boxes_;
+  autoware::euclidean_cluster_gpu::ClusteringParams params_;
+};
+
+int main(int argc, char** argv) {
+  rclcpp::init(argc, argv);
+  rclcpp::spin(std::make_shared<EuclideanClusterGpuNode>());
+  rclcpp::shutdown();
+  return 0;
+}
