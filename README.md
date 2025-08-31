@@ -143,13 +143,16 @@ ros2 launch ultralytics_ros tracker_with_cloud.launch.xml debug:=true
 
 ## 5. Git 저장소(GitHub 등) 연동 및 워크스페이스 동기화
 
-### 1) Git 저장소 초기화 및 첫 커밋
+### 대용량 파일 오류(100MB 초과) 해결 방법
+
+- GitHub는 100MB가 넘는 파일(예: rosbag, .db3 등)을 업로드할 수 없습니다.
+- 아래와 같이 `.gitignore`에 대용량/불필요 파일(rosbag, 로그, 데이터 등)을 반드시 추가하세요.
+
+#### 예시: .gitignore에 rosbag, db3 등 추가
 
 ```bash
-cd ~/detection_ws
-
-# .gitignore 생성 (예시)
-echo "build/
+echo "
+build/
 install/
 log/
 *.pyc
@@ -158,32 +161,52 @@ __pycache__/
 .venv
 models/
 *.pt
+*.db3
+*.bag
+*.sqlite3
+rosbag2_*/
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.log
+*.csv
+*.npy
+*.npz
+*.h5
+*.onnx
+*.pb
+*.pth
+*.ckpt
+*.weights
 " > .gitignore
-
-git init
-git add .
-git commit -m "Initial commit: detection_ws full workspace"
 ```
 
-### 2) 원격 저장소(GitHub 등) 연결 및 푸시
+- 이미 커밋된 대용량 파일은 아래 명령으로 git 기록에서 완전히 제거해야 합니다.
+
+#### 이미 커밋된 대용량 파일 완전 삭제
 
 ```bash
-# 예시: GitHub에 새 저장소 생성 후
-git remote add origin https://github.com/your-username/detection_ws.git
-git branch -M main
-git push -u origin main
+# 1. BFG Repo-Cleaner 설치 (https://rtyley.github.io/bfg-repo-cleaner/)
+sudo apt install openjdk-11-jre
+wget https://repo1.maven.org/maven2/com/madgag/bfg/1.14.0/bfg-1.14.0.jar
+
+# 2. git reflog/GC로 안전장치
+git reflog expire --expire=now --all
+git gc --prune=now --aggressive
+
+# 3. 대용량 파일 완전 삭제 (예: *.db3)
+java -jar bfg-1.14.0.jar --delete-files *.db3
+java -jar bfg-1.14.0.jar --delete-folders rosbag2_ --no-blob-protection
+
+# 4. 다시 GC
+git reflog expire --expire=now --all
+git gc --prune=now --aggressive
+
+# 5. 강제 푸시
+git push --force
 ```
 
-### 3) 이후 동기화(업데이트) 방법
-
-```bash
-# 변경사항 커밋 및 푸시
-git add .
-git commit -m "Update: ...내용..."
-git push
-
-# 원격 저장소에서 최신 내용 받기
-git pull
-```
+- 자세한 방법: [https://docs.github.com/en/repositories/working-with-files/managing-large-files/removing-files-from-a-repositorys-history](https://docs.github.com/en/repositories/working-with-files/managing-large-files/removing-files-from-a-repositorys-history)
 
 ---
