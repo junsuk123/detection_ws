@@ -47,6 +47,26 @@ def generate_launch_description():
         
         return params + [override_params]
 
+    # =============================================================================
+    # Static Transform Publishers (TF Tree)
+    # =============================================================================
+
+    # velodyne -> camera3 : cam3 A의 역행렬
+    tf_cam2_from_lidar = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='tf_cam2_from_lidar',
+        arguments=[
+            '-0.684779167', '0.249383421', '0.455711580',
+            '0.811146537', '-0.324779351', '0.178284640', '-0.452519895',
+            'velodyne', 'camera2'
+        ],
+    )
+
+    # =============================================================================
+    # Main Processing Nodes
+    # =============================================================================
+
     # YOLO Tracker Node
     yolo_tracker_node = Node(
         package='ultralytics_ros',
@@ -91,7 +111,10 @@ def generate_launch_description():
         iou_thres_arg,
         device_arg,
         
-        # Nodes
+        # Static Transform Publishers
+        tf_cam2_from_lidar,
+        
+        # Processing Nodes
         yolo_tracker_node,
         tracker_3d_node,
         rviz_node,

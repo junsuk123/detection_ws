@@ -32,6 +32,36 @@ def generate_launch_description():
     except:
         pass  # Use defaults if config parsing fails
 
+    # =============================================================================
+    # Static Transform Publisher
+    # =============================================================================
+    
+    # base_link -> velodyne : 항등(원점·무회전)
+    tf_base_to_velodyne = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='tf_base_to_velodyne',
+        arguments=['0', '0', '0', '0', '0', '0', '1', 'base_link', 'velodyne'],
+    )
+
+    # =============================================================================
+    # Main Processing Node
+    # =============================================================================
+    
+    cuda_preprocessor_node = Node(
+        package='autoware_cuda_pointcloud_preprocessor',
+        executable='cuda_pointcloud_preprocessor_node',
+        name='cuda_pointcloud_preprocessor',
+        output='screen',
+        parameters=[LaunchConfiguration('cuda_pointcloud_preprocessor_param_file')],
+        remappings=[
+            ('~/input/pointcloud', LaunchConfiguration('input_pointcloud')),
+            ('~/input/imu', LaunchConfiguration('input_imu')),
+            ('~/input/twist', LaunchConfiguration('input_twist')),
+            ('~/output/pointcloud', LaunchConfiguration('output_pointcloud')),
+        ]
+    )
+
     return LaunchDescription([
         # Arguments with defaults from config file
         DeclareLaunchArgument('cuda_pointcloud_preprocessor_param_file', 
@@ -45,18 +75,9 @@ def generate_launch_description():
         DeclareLaunchArgument('output_pointcloud', 
                             default_value=default_topics['output_pointcloud']),
 
-        # Node
-        Node(
-            package='autoware_cuda_pointcloud_preprocessor',
-            executable='cuda_pointcloud_preprocessor_node',
-            name='cuda_pointcloud_preprocessor',
-            output='screen',
-            parameters=[LaunchConfiguration('cuda_pointcloud_preprocessor_param_file')],
-            remappings=[
-                ('~/input/pointcloud', LaunchConfiguration('input_pointcloud')),
-                ('~/input/imu', LaunchConfiguration('input_imu')),
-                ('~/input/twist', LaunchConfiguration('input_twist')),
-                ('~/output/pointcloud', LaunchConfiguration('output_pointcloud')),
-            ]
-        ),
+        # Static Transform Publisher
+        tf_base_to_velodyne,
+        
+        # Main Node
+        cuda_preprocessor_node,
     ])
