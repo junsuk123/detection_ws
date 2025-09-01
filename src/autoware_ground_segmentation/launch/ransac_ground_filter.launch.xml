@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <launch>
   <arg name="ground_segmentation_param_file" default="$(find-pkg-share autoware_ground_segmentation)/config/ransac_ground_filter.param.yaml"/>
-  <arg name="input/pointcloud" default="/velodyne_points"/>
+  <arg name="input/pointcloud" default="/pointcloud_noiseremoved"/>
   <arg name="output/pointcloud" default="/pointcloud_nonground"/>
   <node pkg="autoware_ground_segmentation" exec="ransac_ground_filter_node" name="ransac_ground_filter_node" output="screen">
     <remap from="input" to="$(var input/pointcloud)"/>

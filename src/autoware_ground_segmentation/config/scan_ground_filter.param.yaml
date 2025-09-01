@@ -4,8 +4,8 @@
     use_virtual_ground_point: false
 
         # 실내 평지, 바닥 링 제거 강화를 위한 파라미터
-    global_slope_max_angle_deg: 3.0
-    local_slope_max_angle_deg: 2.0
+    global_slope_max_angle_deg: 10.0
+    local_slope_max_angle_deg: 13.0	
     split_points_distance_tolerance: 0.40   # 레이 간격 넓게 허용
     split_height_distance: 0.50             # 지면 seed 연결 허용 높이
     non_ground_height_threshold: 0.15       # 지면 오차 허용
