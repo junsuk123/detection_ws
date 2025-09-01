@@ -68,6 +68,7 @@ install(PROGRAMS
 )
 
 install(DIRECTORY
+  config
   launch
   rviz2
   DESTINATION share/${PROJECT_NAME}

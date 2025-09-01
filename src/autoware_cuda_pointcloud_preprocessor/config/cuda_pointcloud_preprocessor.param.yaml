@@ -1,6 +1,21 @@
 /**:
   ros__parameters:
+    # =============================================================================
+    # 토픽 설정 (launch 파일에서 오버라이드 가능)
+    # =============================================================================
+    
+    # 입력 토픽들
+    input_pointcloud_topic: "/velodyne_points"
+    input_imu_topic: "/iahrs/imu"
+    input_twist_topic: "/sensing/vehicle_velocity_converter/twist_with_covariance"
+    
+    # 출력 토픽
+    output_pointcloud_topic: "/pointcloud/noise_removed"
 
+    # =============================================================================
+    # 기본 설정
+    # =============================================================================
+    
     base_frame: base_link
     use_imu: false
     use_3d_distortion_correction: false

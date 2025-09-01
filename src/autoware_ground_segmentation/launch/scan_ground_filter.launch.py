@@ -50,11 +50,20 @@ def launch_setup(context, *args, **kwargs):
             remappings=[
                 ("input", LaunchConfiguration("input/pointcloud")),
                 ("output", LaunchConfiguration("output/pointcloud")),
+                ("output/ground", LaunchConfiguration("output/ground_pointcloud")),
+                ("~/debug/processing_time", LaunchConfiguration("processing_time_topic")),
+                ("~/debug/processing_time_detail", LaunchConfiguration("processing_time_detail_topic")),
             ],
             parameters=[
                 ground_segmentation_param["common_ground_filter"]["parameters"],
                 {"input_frame": "base_link"},
                 {"output_frame": "base_link"},
+                # launch 파라미터로 토픽명 오버라이드
+                {"input_pointcloud_topic": LaunchConfiguration("input/pointcloud")},
+                {"output_pointcloud_topic": LaunchConfiguration("output/pointcloud")},
+                {"output_ground_pointcloud_topic": LaunchConfiguration("output/ground_pointcloud")},
+                {"processing_time_topic": LaunchConfiguration("processing_time_topic")},
+                {"processing_time_detail_topic": LaunchConfiguration("processing_time_detail_topic")},
                 vehicle_info_param,
             ],
         ),
@@ -104,8 +113,13 @@ def generate_launch_description():
         [
             vehicle_info_param,
             add_launch_arg("container", ""),
-            add_launch_arg("input/pointcloud", "/pointcloud_noiseremoved"),
-            add_launch_arg("output/pointcloud", "/pointcloud_nonground"),
+            # 입출력 토픽 파라미터들
+            add_launch_arg("input/pointcloud", "/pointcloud/noise_removed"),
+            add_launch_arg("output/pointcloud", "/pointcloud/ground_removed"),
+            add_launch_arg("output/ground_pointcloud", "/pointcloud/ground_only"),
+            # 디버그/모니터링 토픽들
+            add_launch_arg("processing_time_topic", "/debug/ground_filter/processing_time_ms"),
+            add_launch_arg("processing_time_detail_topic", "/debug/ground_filter/processing_time_detail_ms"),
         ]
         + [OpaqueFunction(function=launch_setup)]
     )

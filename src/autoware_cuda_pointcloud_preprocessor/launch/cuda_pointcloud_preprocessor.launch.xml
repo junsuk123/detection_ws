@@ -1,16 +1,23 @@
 <launch>
-  <arg name="input/pointcloud" default="/velodyne_points"/>
-  <arg name="input/imu" default="/iahrs/imu"/>
-  <arg name="input/twist" default="/sensing/vehicle_velocity_converter/twist_with_covariance"/>
-  <arg name="output/pointcloud" default="/pointcloud_noiseremoved"/>
-
+  <!-- Config 파일 경로 -->
   <arg name="cuda_pointcloud_preprocessor_param_file" default="$(find-pkg-share autoware_cuda_pointcloud_preprocessor)/config/cuda_pointcloud_preprocessor.param.yaml"/>
+  
+  <!-- 토픽 오버라이드 인자들 -->
+  <arg name="input_pointcloud" default="/velodyne_points"/>
+  <arg name="input_imu" default="/iahrs/imu"/>
+  <arg name="input_twist" default="/sensing/vehicle_velocity_converter/twist_with_covariance"/>
+  <arg name="output_pointcloud" default="/pointcloud/noise_removed"/>
 
   <node pkg="autoware_cuda_pointcloud_preprocessor" exec="cuda_pointcloud_preprocessor_node" name="cuda_pointcloud_preprocessor" output="screen">
-    <remap from="~/input/pointcloud" to="$(var input/pointcloud)"/>
-    <remap from="~/input/imu" to="$(var input/imu)"/>
-    <remap from="~/input/twist" to="$(var input/twist)"/>
-    <remap from="~/output/pointcloud" to="$(var output/pointcloud)"/>
+    
+    <!-- Config 파일 로드 -->
     <param from="$(var cuda_pointcloud_preprocessor_param_file)"/>
+    
+    <!-- 토픽 리맵핑 (launch 인자 사용) -->
+    <remap from="~/input/pointcloud" to="$(var input_pointcloud)"/>
+    <remap from="~/input/imu" to="$(var input_imu)"/>
+    <remap from="~/input/twist" to="$(var input_twist)"/>
+    <remap from="~/output/pointcloud" to="$(var output_pointcloud)"/>
+    
   </node>
 </launch>

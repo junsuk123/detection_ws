@@ -1,11 +1,11 @@
 /**:
   ros__parameters:
     # ====== 입력/출력 토픽 ======
-    input: /pointcloud_nonground
-    output_clusters: /perception/clustered/points
-    output_boxes: /perception/clustered/boxes
-    output_clusters_only: /perception/clustered/points_only
-    output_markers: /perception/clustered/markers
+    input: /pointcloud/ground_removed 
+    output_clusters: /pointcloud/beforeclustered
+    output_boxes: /pointcloud/clustered/boxes
+    output_clusters_only: /pointcloud/clustered
+    output_markers: /pointcloud/clustered/markers
 
     # ====== 클러스터링 파라미터 ======
     voxel_size: 0.00001         # 더 작은 voxel (ex: 0.03~0.07도 실험 가능)

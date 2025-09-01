@@ -1,5 +1,20 @@
 /**:
   ros__parameters:
+    # =============================================================================
+    # 토픽 설정 (launch 파일에서 오버라이드 가능)
+    # =============================================================================
+    
+    # 입력 포인트클라우드 토픽
+    input_pointcloud_topic: "/pointcloud/noise_removed"
+    
+    # 출력 토픽들
+    output_pointcloud_topic: "/pointcloud/ground_removed"          # 비지면 포인트 (장애물)
+    output_ground_pointcloud_topic: "/pointcloud/ground_only"      # 지면 포인트만
+    
+    # 처리 시간 정보 토픽
+    processing_time_topic: "/debug/processing_time_ms"
+    processing_time_detail_topic: "/debug/processing_time_detail_ms"
+
     common_ground_filter:
       plugin: "autoware::ground_segmentation::ScanGroundFilterComponent"
       parameters:
