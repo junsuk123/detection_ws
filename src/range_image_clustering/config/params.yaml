@@ -1,0 +1,68 @@
+/**:
+  ros__parameters:
+    # 입/출력 토픽
+    input_topic: "/pointcloud/ground_removed"
+    output_cloud_topic: "/pointcloud/clustered/boxes"
+    output_markers_topic: "/pointcloud/clustered/markers"
+
+    # QoS 설정
+    use_sensor_data_qos: true      # 센서 데이터에 적합한 QoS 사용 (BEST_EFFORT)
+    qos_history_depth: 5           # QoS 히스토리 깊이
+
+    # 레인지 이미지 파라미터 - 조정됨
+    range_image_width: 360        # 0.5도 해상도로 360도 (성능 향상)
+    range_image_height: 32        # 수직 해상도 개선
+    
+    # 클러스터링 파라미터 튜닝
+    angle_threshold: 0.1         # 라디안 단위 (약 8.6도) - 약간 완화
+    distance_threshold: 0.1       # 미터 단위
+    min_cluster_size: 2           # 최소 3개 포인트 필요 (노이즈 감소)
+    max_cluster_size: 5000        # 큰 클러스터 허용
+
+    # 시각화 파라미터
+    marker_lifetime: 0.2          # 마커 라이프타임 (초)
+    point_size: 3.0               # 포인트 시각화 크기
+    
+    # 프레임 설정
+    fixed_frame: "velodyne"       # 고정 프레임 ID
+    
+    # 거리별 임계값 조정
+    enable_adaptive_threshold: true
+    min_distance_for_adaptive: 5.0  
+    max_adaptive_factor: 4.0        # 더 큰 적응 계수
+
+    # ====== ROI 파라미터 (관심영역) ======
+    use_roi_filter: true          # ROI 필터링 사용 여부
+    roi_x_min: 0.0                # x축 최소 거리(m)
+    roi_x_max: 1.2                # x축 최대 거리(m) 
+    roi_y_min: -0.3               # y축 최소 거리(m)
+    roi_y_max: 0.5                # y축 최대 거리(m)
+    roi_z_min: -0.5               # z축 최소 거리(m)
+    roi_z_max: 1.5                # z축 최대 거리(m)
+
+    # 다단계 클러스터링 설정
+    use_multi_level_clustering: true
+    clustering_levels: 2
+    distance_threshold_step: 0.15   # 더 큰 단계 증가
+    angle_threshold_step: 0.07      # 더 큰 단계 증가
+
+    # 클러스터 품질 평가
+    evaluate_cluster_quality: true
+    min_cluster_density: 0.01
+    max_cluster_elongation: 5.0
+
+    # 클러스터 병합 설정
+    merge_clusters: true
+    cluster_merge_threshold: 0.3
+    cluster_merge_angle: 0.5
+
+    # 포인트 특성 기반 클러스터링
+    use_point_features: true   # 성능 영향이 있으므로 선택적 사용
+    feature_weight: 0.75
+    curvature_threshold: 0.05
+    normal_angle_weight: 0.3
+    
+    # 자동 튜닝 설정
+    enable_auto_tuning: true   # 실험적 기능
+    auto_tuning_target_clusters: 20
+    auto_tuning_max_iterations: 5

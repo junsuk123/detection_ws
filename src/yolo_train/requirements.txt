@@ -1,0 +1,14 @@
+# 반드시 NumPy 1.x 계열로 설치 (2.x 비허용)
+numpy<2
+
+# PyTorch with CUDA 12.1
+torch==2.2.2+cu121
+torchvision==0.17.2+cu121
+torchaudio==2.2.2+cu121
+--extra-index-url https://download.pytorch.org/whl/cu121
+
+# 기타 의존성
+ultralytics>=8.0.195
+labelme2yolo==0.2.5
+Pillow>=10.0
+matplotlib>=3.0

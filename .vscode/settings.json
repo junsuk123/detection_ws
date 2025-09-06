@@ -5,6 +5,7 @@
         "functional": "cpp",
         "limits": "cpp",
         "__locale": "cpp",
-        "ios": "cpp"
+        "ios": "cpp",
+        "tmpfile": "cpp"
     }
 }

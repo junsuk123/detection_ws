@@ -52,15 +52,16 @@ def generate_launch_description():
     # =============================================================================
 
     # velodyne -> camera3 : cam3 A의 역행렬
-    tf_cam2_from_lidar = Node(
+    tf_cam3_from_lidar = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
-        name='tf_cam2_from_lidar',
+        name='tf_cam3_from_lidar',
         arguments=[
-            '-0.684779167', '0.249383421', '0.455711580',
-            '0.811146537', '-0.324779351', '0.178284640', '-0.452519895',
-            'velodyne', 'camera2'
-        ],
+            '0', '0', '0.015',     # x y z (z만 1.5cm)
+            '-0.5', '0.5', '-0.5', '0.5',    # qx qy qz qw (회전 없음)
+            'velodyne', 'camera3'  # parent child
+        ]
+
     )
 
     # =============================================================================
@@ -112,8 +113,8 @@ def generate_launch_description():
         device_arg,
         
         # Static Transform Publishers
-        tf_cam2_from_lidar,
-        
+        tf_cam3_from_lidar,
+
         # Processing Nodes
         yolo_tracker_node,
         tracker_3d_node,

@@ -5,8 +5,8 @@
     # =============================================================================
     
     # 입력 토픽들
-    input_topic: "/camera2/image_raw"               # YOLO 입력 이미지
-    camera_info_topic: "/camera2/camera_info"       # 카메라 정보
+    input_topic: "/camera3/image_raw"               # YOLO 입력 이미지
+    camera_info_topic: "/camera3/camera_info"       # 카메라 정보
     lidar_topic: "/pointcloud/clustered"            # 클러스터된 포인트클라우드
     
     # 출력 토픽들
@@ -19,11 +19,11 @@
     # =============================================================================
     
     # YOLO 모델 파일 경로
-    yolo_model: "labacon.pt"  # models 폴더 내 상대 경로
+    yolo_model: "best.pt"  # models 폴더 내 상대 경로
     model_path: ""            # launch에서 자동 설정됨
     
     # YOLO 추론 파라미터
-    conf_thres: 0.3      # 신뢰도 임계값 (0.0-1.0, 낮을수록 더 많은 검출)
+    conf_thres: 0.2      # 신뢰도 임계값 (0.0-1.0, 낮을수록 더 많은 검출)
     iou_thres: 0.45      # IoU 임계값 (0.0-1.0, 낮을수록 더 적은 중복 제거)
     max_det: 300         # 최대 검출 개수
     device: "cuda:0"     # 추론 디바이스 (cuda:0, cpu 등)
@@ -66,13 +66,13 @@
     cluster_tolerance: 0.25   # 클러스터 허용 거리 [m]
     voxel_leaf_size: 0.01     # 복셀 필터 크기 [m]
     min_cluster_size: 5       # 최소 클러스터 크기
-    max_cluster_size: 150000  # 최대 클러스터 크기
+    max_cluster_size: 500  # 최대 클러스터 크기
     
     # 추가 3D 처리 파라미터
     use_reliable_lidar: false # true: 신뢰성 있는 LiDAR QoS 사용
-    min_points_in_bbox: 20    # 바운딩박스 내 최소 포인트 수
-    min_ratio_in_cluster: 0.0 # 클러스터 내 최소 비율
-    max_clusters_per_det: 1   # 검출당 최대 클러스터 수
+    min_points_in_bbox: 6    # 바운딩박스 내 최소 포인트 수
+    min_ratio_in_cluster: 0.3 # 클러스터 내 최소 비율
+    max_clusters_per_det: 50   # 검출당 최대 클러스터 수
     exclusive_cluster: true   # 독점적 클러스터 할당
     
     # 거리 기반 필터링
@@ -104,7 +104,7 @@
     # =============================================================================
     
     # 디버그 모드
-    debug_mode: false              # 디버그 정보 출력
+    debug_mode: true              # 디버그 정보 출력
     publish_debug_pointcloud: false # 디버그 포인트클라우드 발행
     publish_debug_image: false     # 디버그 이미지 발행
     

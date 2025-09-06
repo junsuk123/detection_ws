@@ -1,0 +1,7 @@
+path: /home/j/detection_ws/src/yolo_train/merged_dataset/image/YOLODataset
+train: images/train
+val: images/val
+test:
+
+names:
+    0: b_cone
