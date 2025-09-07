@@ -72,22 +72,6 @@ def generate_launch_description():
     # Base parameters from config file
     config_file = LaunchConfiguration('config_file')
 
-    # =============================================================================
-    # Static Transform Publishers (TF Tree)
-    # =============================================================================
-
-    # velodyne -> camera3 : cam3 A의 역행렬
-    tf_cam3_from_lidar = Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        name='tf_cam3_from_lidar',
-        arguments=[
-            '0', '0', '0.015',     # x y z (z만 1.5cm)
-            '-0.5', '0.5', '-0.5', '0.5',    # qx qy qz qw (회전 없음)
-            'velodyne', 'camera3'  # parent child
-        ]
-    )
-
     # RViz2 Node (only when debug=true)
     rviz_node = Node(
         package='rviz2',
@@ -98,13 +82,13 @@ def generate_launch_description():
         output='screen'
     )
 
-    # 활성 카메라를 감지하고 그에 따라 노드를 생성하는 함수
+    # 동적으로 노드를 생성하는 함수
     def launch_setup(context):
         # 활성 카메라 목록 가져오기
         active_cameras = get_active_cameras(context)
         
-        # 기본 런치 엔티티
-        launch_entities = [tf_cam3_from_lidar, rviz_node]
+        # 기본 런치 엔티티 (정적 TF 노드는 제외 - USB_CAM에서 처리)
+        launch_entities = [rviz_node]  # TF 노드 제거됨
         
         # 각 카메라마다 YOLO 트래커 노드 생성
         yolo_nodes = []
@@ -122,21 +106,6 @@ def generate_launch_description():
                 'yolo_result_image_topic': f'/detection/{camera_name}/yolo_result_image',
                 'camera_name': camera_name
             }
-            
-            # 추가 TF 설정 (기본 카메라(camera3)가 아닌 경우)
-            if camera_name != 'camera3':
-                # velodyne -> camera# TF 생성 (기본 셋업과 동일하게)
-                tf_node = Node(
-                    package='tf2_ros',
-                    executable='static_transform_publisher',
-                    name=f'tf_{camera_name}_from_lidar',
-                    arguments=[
-                        '0', '0', '0.015',  # x y z
-                        '-0.5', '0.5', '-0.5', '0.5',  # qx qy qz qw
-                        'velodyne', camera_name  # parent child
-                    ]
-                )
-                launch_entities.append(tf_node)
             
             # YOLO 트래커 노드 생성
             yolo_node = Node(
