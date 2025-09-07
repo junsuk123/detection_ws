@@ -1,2 +1,6 @@
 .vscode
 compile_commands.json
+# 모델 파일 예외 처리 - LFS로 관리되는 파일들은 무시하지 않음
+!models/
+!models/*.pt
+!models/**/*.pt
