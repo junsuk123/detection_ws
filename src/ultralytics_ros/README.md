@@ -175,3 +175,76 @@ $ cd ~/catkin_ws/src/ultralytics_ros/rosbag && rosbag play kitti_2011_09_26_driv
 $ ros2 launch ultralytics_ros kitti_tracker_with_cloud.launch.xml
 $ cd ~/colcon_ws/src/ultralytics_ros/ros2bag && ros2 bag play kitti_2011_09_26_drive_0106_synced --clock --loop
 ```
+
+# Ultralytics ROS
+
+ROS2용 Ultralytics YOLOv8 래퍼 패키지
+
+## Git LFS 설정
+
+이 저장소는 모델 파일 관리를 위해 Git LFS(Large File Storage)를 사용합니다.
+
+### 요구사항
+
+- Git LFS가 설치되어 있어야 합니다.
+
+### 사용 방법
+
+1. Git LFS 설치:
+   ```bash
+   sudo apt-get install git-lfs
+   ```
+
+2. 저장소 클론 후 LFS 파일 다운로드:
+   ```bash
+   git clone <repository-url>
+   cd ultralytics_ros
+   git lfs install
+   git lfs pull
+   ```
+
+### 모델 파일 추가하기
+
+모델 파일을 추가하려면 다음 단계를 따르세요:
+
+1. 모델 파일을 `models/` 디렉토리에 복사:
+   ```bash
+   cp /path/to/your/model.pt models/
+   ```
+
+2. Git에 추가 및 커밋:
+   ```bash
+   git add models/*.pt
+   git commit -m "Add YOLOv8 model files"
+   git push origin main
+   ```
+
+## 설치 및 사용 방법
+
+## 모델 파일 관리
+
+### 모델 파일 추가 방법
+
+이 저장소의 모델 파일은 Git LFS로 관리되며, `.gitignore`에서 예외 처리되어 있습니다.
+모델 파일을 추가할 때는 다음 절차를 따르세요:
+
+1. 모델 파일을 models/ 디렉토리에 복사:
+   ```bash
+   cp /path/to/your/model.pt models/
+   ```
+
+2. Git에 강제 추가 및 커밋 (필요한 경우):
+   ```bash
+   git add -f models/*.pt
+   git commit -m "Add model files"
+   git push origin main
+   ```
+
+### 기본 모델 다운로드
+
+기본 YOLOv8 모델을 다운로드하려면:
+```bash
+mkdir -p models
+wget -O models/yolov8n.pt https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8n.pt
+wget -O models/yolov8s.pt https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8s.pt
+```
