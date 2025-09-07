@@ -15,6 +15,18 @@ RangeImageClustering::RangeImageClustering() : width_(0), height_(0), input_clou
   params_.max_cluster_size = 10000;
   params_.range_image_width = 1800;
   params_.range_image_height = 32;
+  
+  // 추가된 기본 파라미터
+  params_.use_sensor_channel_map = true;  // 센서 채널 매핑 사용
+  params_.depth_discontinuity_threshold = 0.1f;  // 깊이 불연속 임계값
+  params_.adaptive_min_cluster_size = true;  // 적응형 최소 클러스터 크기 사용
+  params_.min_cluster_size_factor = 0.5f;  // 거리에 따른 최소 크기 감소 계수
+  
+  // acos 최적화를 위한 각도 임계값의 코사인 미리 계산
+  cos_angle_threshold_ = cos(params_.angle_threshold);
+  
+  // 기본 센서 채널 각도 맵 초기화 (Velodyne VLP-16 기준, 실제 센서에 맞게 조정 필요)
+  initializeDefaultChannelMap();
 }
 
 RangeImageClustering::~RangeImageClustering() {}
@@ -87,10 +99,54 @@ void RangeImageClustering::computePointFeatures() {
   std::cout << "포인트 특성 계산 완료" << std::endl;
 }
 
+// 기본 센서 채널 맵 초기화 (새로 추가된 함수)
+void RangeImageClustering::initializeDefaultChannelMap() {
+  // 기본값으로 Velodyne VLP-16/32 유사한 패턴 사용 (실제 센서 스펙에 맞게 조정 필요)
+  channel_elevation_map_.resize(params_.range_image_height);
+  
+  // 예: VLP-32C와 유사한 비균일 수직각 패턴 (-25° ~ +15°, 불균등 간격)
+  if (params_.range_image_height == 32) {
+    const float vlp32_angles[32] = {
+      -25.0f, -1.0f, -1.667f, -15.639f, -11.31f, 0.0f, -0.667f, -8.843f,
+      -7.254f, 0.333f, -0.333f, -6.148f, -5.333f, 1.333f, 0.667f, -4.0f,
+      -4.667f, 1.667f, 1.0f, -3.667f, -3.333f, 3.333f, 2.333f, -2.667f,
+      -3.0f, 7.0f, 4.667f, -2.333f, -2.0f, 15.0f, 10.333f, -1.333f
+    };
+    for (int i = 0; i < 32; i++) {
+      channel_elevation_map_[i] = vlp32_angles[i] * M_PI / 180.0f;  // 각도를 라디안으로 변환
+    }
+  } 
+  // VLP-16 패턴 (-15° ~ +15°, 2° 간격)
+  else if (params_.range_image_height == 16) {
+    for (int i = 0; i < 16; i++) {
+      channel_elevation_map_[i] = (-15.0f + i * 2.0f) * M_PI / 180.0f;
+    }
+  }
+  // 균일 분포로 대체 (실제 센서가 아닌 경우)
+  else {
+    for (int i = 0; i < params_.range_image_height; i++) {
+      float angle = -M_PI/4.0f + (M_PI/2.0f) * i / (params_.range_image_height - 1);
+      channel_elevation_map_[i] = angle;
+    }
+  }
+  
+  std::cout << "센서 채널 맵 초기화됨 - 채널 수: " << channel_elevation_map_.size() << std::endl;
+}
+
+// 새로운 함수: 센서 채널 맵 설정
+void RangeImageClustering::setChannelMap(const std::vector<float>& channel_angles_deg) {
+  channel_elevation_map_.resize(channel_angles_deg.size());
+  for (size_t i = 0; i < channel_angles_deg.size(); i++) {
+    channel_elevation_map_[i] = channel_angles_deg[i] * M_PI / 180.0f;
+  }
+  params_.range_image_height = channel_elevation_map_.size();
+  std::cout << "사용자 정의 센서 채널 맵 설정됨 - 채널 수: " << params_.range_image_height << std::endl;
+}
+
 void RangeImageClustering::createRangeImage(const pcl::PointCloud<pcl::PointXYZI>::Ptr& cloud) {
   // 레인지 이미지 파라미터 설정
-  width_ = params_.range_image_width;  // 레인지 이미지 너비
-  height_ = params_.range_image_height;  // 레인지 이미지 높이
+  width_ = params_.range_image_width;
+  height_ = params_.range_image_height;
   
   range_image_.resize(width_ * height_, -1.0f);  // -1은 데이터 없음을 표시
   point_indices_.resize(width_ * height_, -1);   // -1은 포인트 없음을 표시
@@ -115,14 +171,12 @@ void RangeImageClustering::createRangeImage(const pcl::PointCloud<pcl::PointXYZI
       continue; // 너무 가까운 포인트 제외
     }
     
-    // 수정: azimuth와 elevation 계산 방식 개선
     // azimuth는 -pi ~ pi
     float azimuth = atan2(point.y, point.x);
     
-    // elevation은 -pi/2 ~ pi/2
+    // 고도각 계산
     float elevation = atan2(point.z, sqrt(point.x*point.x + point.y*point.y));
     
-    // 픽셀 좌표로 변환 개선
     // 방위각을 [0, width_] 범위로 변환
     int col = static_cast<int>((azimuth + M_PI) / (2.0 * M_PI) * width_);
     
@@ -130,10 +184,32 @@ void RangeImageClustering::createRangeImage(const pcl::PointCloud<pcl::PointXYZI
     if (col < 0) col += width_;
     if (col >= width_) col %= width_;
     
-    // 고도각을 [0, height_] 범위로 변환 - 개선된 공식
-    int row = static_cast<int>((elevation + M_PI/2) / M_PI * height_);
+    // *** 개선: 센서 채널 맵 사용하여 행 결정 ***
+    int row = -1;
     
-    // 배열 범위 안전성 검사
+    // 실제 ring 값이 있으면 사용 (PointXYZIR 타입일 경우)
+    // 참고: 실제 구현 시 PointXYZIR 타입으로 변경하거나 ring 필드 접근 로직 추가 필요
+    
+    // 센서 채널 맵 사용
+    if (params_.use_sensor_channel_map && !channel_elevation_map_.empty()) {
+      // 측정된 elevation과 가장 가까운 채널 찾기
+      float min_diff = M_PI;
+      for (size_t r = 0; r < channel_elevation_map_.size(); r++) {
+        float diff = fabs(elevation - channel_elevation_map_[r]);
+        if (diff < min_diff) {
+          min_diff = diff;
+          row = r;
+        }
+      }
+    } 
+    // 균일 매핑 사용 (기존 방식)
+    else {
+      row = static_cast<int>((elevation + M_PI/2) / M_PI * height_);
+      if (row < 0) row = 0;
+      if (row >= height_) row = height_ - 1;
+    }
+    
+    // 유효한 행인지 확인
     if (row >= 0 && row < height_) {
       int idx = row * width_ + col;
       // 가장 가까운 포인트만 저장 (중복된 픽셀이 있을 경우)
@@ -178,6 +254,9 @@ void RangeImageClustering::performClustering() {
         total_points++;
       }
     }
+    
+    // 미리 각도 임계값의 코사인 값 계산 (acos 호출 최적화)
+    float cos_angle_threshold = cos(params_.angle_threshold);
     
     // BFS 기반 클러스터링 - 레인지 이미지에서 직접 시작
     for (int row = 0; row < height_; row++) {
@@ -254,21 +333,54 @@ void RangeImageClustering::performClustering() {
                   continue;
                 }
                 
-                float dist = pcl::euclideanDistance(point, neighbor_point);
+                float d1 = range_image_[curr_img_idx];  // 현재 점 거리
+                float d2 = range_image_[new_img_idx];   // 이웃 점 거리
                 
-                // 정규화된 벡터 간의 각도 계산
-                Eigen::Vector3f v1(point.x, point.y, point.z);
-                Eigen::Vector3f v2(neighbor_point.x, neighbor_point.y, neighbor_point.z);
-                float len1 = v1.norm();
-                float len2 = v2.norm();
+                // *** 개선: 깊이 불연속 기반 연결 판정 ***
+                bool connected = false;
                 
-                if (len1 < 1e-6 || len2 < 1e-6) continue;
+                // 1. 거리 차이 검사
+                float distance_diff = fabs(d1 - d2);
+                float adaptive_dist_threshold = params_.distance_threshold * (1.0f + 0.1f * std::min(d1, d2));
                 
-                v1.normalize();
-                v2.normalize();
-                float angle = acos(std::min(1.0f, std::max(-1.0f, v1.dot(v2))));
+                if (distance_diff < adaptive_dist_threshold) {
+                  // 2. 깊이 불연속 검사 - 더 정교한 기준
+                  // 인접 셀 사이의 각도 분해능 계산 (인접 픽셀 간 각도)
+                  float alpha = (dc != 0 && dr != 0) ? M_PI / (width_ * 1.414f) : M_PI / width_; // 대각선이면 보정
+                  
+                  // 더 먼 거리를 d2로 설정
+                  float temp_d1 = d1, temp_d2 = d2;
+                  if (d1 > d2) {
+                    std::swap(temp_d1, temp_d2);
+                  }
+                  
+                  // 깊이 불연속 각도 계산
+                  float beta = atan2(temp_d2 * sin(alpha), temp_d1 - temp_d2 * cos(alpha));
+                  
+                  if (beta < params_.depth_discontinuity_threshold) {
+                    connected = true;
+                  }
+                  // 3. 기존 백업 방식 - 정규화된 벡터 내적
+                  else {
+                    Eigen::Vector3f v1(point.x, point.y, point.z);
+                    Eigen::Vector3f v2(neighbor_point.x, neighbor_point.y, neighbor_point.z);
+                    float len1 = v1.norm();
+                    float len2 = v2.norm();
+                    
+                    if (len1 > 1e-6 && len2 > 1e-6) {
+                      v1.normalize();
+                      v2.normalize();
+                      float dot_product = v1.dot(v2);
+                      
+                      // *** 개선: acos 호출 제거, 직접 코사인 값 비교 ***
+                      if (dot_product >= cos_angle_threshold) {
+                        connected = true;
+                      }
+                    }
+                  }
+                }
                 
-                if (dist < current_distance_threshold && angle < params_.angle_threshold) {
+                if (connected) {
                   neighbors.push(std::make_pair(new_row, new_col));
                   processed[neighbor_idx] = true;
                   processed_points++;
@@ -285,8 +397,26 @@ void RangeImageClustering::performClustering() {
           single_point_clusters++;
         }
         
-        // 크기 기준 충족 여부 확인 - 수정: 단일 포인트도 클러스터로 인정
-        if (cluster_indices.indices.size() >= static_cast<size_t>(params_.min_cluster_size) && 
+        // *** 개선: 거리에 따른 적응형 최소 클러스터 크기 ***
+        int min_size = params_.min_cluster_size;
+        if (params_.adaptive_min_cluster_size && !cluster_indices.indices.empty()) {
+          // 클러스터의 평균 거리 계산
+          float avg_distance = 0.0f;
+          for (const auto& idx : cluster_indices.indices) {
+            const auto& pt = input_cloud_->points[idx];
+            avg_distance += sqrt(pt.x*pt.x + pt.y*pt.y + pt.z*pt.z);
+          }
+          avg_distance /= cluster_indices.indices.size();
+          
+          // 거리에 따라 최소 크기 조정 (먼 거리일수록 더 적은 포인트 허용)
+          if (avg_distance > 10.0f) { // 10m 이상
+            float factor = std::max(0.2f, 10.0f / avg_distance * params_.min_cluster_size_factor);
+            min_size = std::max(3, static_cast<int>(params_.min_cluster_size * factor));
+          }
+        }
+        
+        // 크기 기준 충족 여부 확인
+        if (cluster_indices.indices.size() >= static_cast<size_t>(min_size) && 
             cluster_indices.indices.size() <= static_cast<size_t>(params_.max_cluster_size)) {
           clusters_.push_back(cluster_indices);
           clusters_found++;
@@ -527,7 +657,14 @@ bool RangeImageClustering::shouldMergeClusters(
     const pcl::PointIndices& cluster1, 
     const pcl::PointIndices& cluster2) {
   
-  // 두 클러스터의 중심점 계산
+  // *** 개선: 더 강건한 병합 기준 ***
+  
+  // 1. 경계 상자 계산
+  Eigen::Vector4f min_pt1, max_pt1, min_pt2, max_pt2;
+  pcl::getMinMax3D(*input_cloud_, cluster1.indices, min_pt1, max_pt1);
+  pcl::getMinMax3D(*input_cloud_, cluster2.indices, min_pt2, max_pt2);
+  
+  // 2. 중심점 계산
   Eigen::Vector3f centroid1(0, 0, 0), centroid2(0, 0, 0);
   
   for (auto idx : cluster1.indices) {
@@ -544,11 +681,37 @@ bool RangeImageClustering::shouldMergeClusters(
   }
   centroid2 /= cluster2.indices.size();
   
-  // 중심점 간 거리
+  // 3. 중심점 간 거리
   float distance = (centroid1 - centroid2).norm();
   
-  // 병합 결정: 거리가 임계값보다 작으면 병합
-  return distance < params_.cluster_merge_threshold;
+  // 4. 경계 상자 확장 및 교차 여부 확인
+  const float expansion_factor = 1.1f;  // 10% 확장
+  Eigen::Vector4f expanded_min_pt1, expanded_max_pt1;
+  Eigen::Vector4f expanded_min_pt2, expanded_max_pt2;
+  
+  // 경계 상자 확장
+  for (int i = 0; i < 3; i++) {
+    float size1 = max_pt1[i] - min_pt1[i];
+    float size2 = max_pt2[i] - min_pt2[i];
+    
+    expanded_min_pt1[i] = min_pt1[i] - size1 * (expansion_factor - 1.0f) / 2;
+    expanded_max_pt1[i] = max_pt1[i] + size1 * (expansion_factor - 1.0f) / 2;
+    
+    expanded_min_pt2[i] = min_pt2[i] - size2 * (expansion_factor - 1.0f) / 2;
+    expanded_max_pt2[i] = max_pt2[i] + size2 * (expansion_factor - 1.0f) / 2;
+  }
+  
+  // 경계 상자 교차 여부 확인
+  bool boxes_intersect = true;
+  for (int i = 0; i < 3; i++) {
+    if (expanded_max_pt1[i] < expanded_min_pt2[i] || expanded_max_pt2[i] < expanded_min_pt1[i]) {
+      boxes_intersect = false;
+      break;
+    }
+  }
+  
+  // 5. 병합 결정: 거리가 임계값보다 작고 경계 상자가 교차하면 병합
+  return distance < params_.cluster_merge_threshold && boxes_intersect;
 }
 
 void RangeImageClustering::getClusteredCloudWithIntensity(pcl::PointCloud<pcl::PointXYZI>::Ptr& clustered_cloud) {

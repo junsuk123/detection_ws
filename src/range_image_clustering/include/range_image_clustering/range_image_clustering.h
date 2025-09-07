@@ -42,12 +42,29 @@ struct ClusteringParams {
   bool merge_clusters = false;               // 클러스터 병합 여부
   float cluster_merge_threshold = 0.3f;      // 클러스터 병합 거리 임계값(m)
   float cluster_merge_angle = 0.5f;          // 클러스터 병합 각도 임계값(rad)
+  bool use_improved_merge_criteria = false;  // 개선된 병합 기준 사용
+  float merge_box_expansion_factor = 1.1f;   // 병합을 위한 경계 상자 확장 계수
   
   // 포인트 특성 기반 클러스터링
   bool use_point_features = false;       // 포인트 특성 사용 여부
   float feature_weight = 0.5f;           // 특성 가중치 (0-1)
   float curvature_threshold = 0.05f;     // 곡률 임계값
   float normal_angle_weight = 0.3f;      // 법선 각도 가중치
+  
+  // 센서 채널 매핑 관련
+  bool use_sensor_channel_map = false;   // 센서 채널 맵 사용 여부
+  std::string sensor_model = "VLP-16";   // 센서 모델 이름
+  
+  // 깊이 불연속 기반 클러스터링
+  float depth_discontinuity_threshold = 0.15f;  // 깊이 불연속 각도 임계값(라디안)
+  
+  // 적응형 최소 클러스터 크기
+  bool adaptive_min_cluster_size = false;   // 거리에 따른 최소 크기 조정
+  float min_cluster_size_factor = 0.5f;     // 최소 크기 감소 계수 (0.5 = 최대 50% 감소)
+  int min_far_cluster_size = 3;             // 원거리에서의 최소 클러스터 크기
+  
+  // 성능 최적화
+  bool enable_acos_optimization = true;     // acos 호출 최적화 사용
 };
 
 class RangeImageClustering {
@@ -66,6 +83,10 @@ public:
   void getClusterMarkers(visualization_msgs::msg::MarkerArray& markers, 
                          const std::string& frame_id, double lifetime = 0.1);
   void getAllClusters(std::vector<pcl::PointIndices>& all_clusters) const;
+
+  // 새로운 함수
+  void setChannelMap(const std::vector<float>& channel_angles_deg);
+  void initializeDefaultChannelMap();
 
 private:
   // 기본 클러스터링 변수
@@ -100,6 +121,10 @@ private:
   std::vector<float> point_curvatures_;
   std::vector<Eigen::Vector3f> point_normals_;
   bool features_computed_ = false;
+
+  // 추가된 멤버 변수
+  std::vector<float> channel_elevation_map_;  // 센서 채널 각도 맵 (라디안)
+  float cos_angle_threshold_;                // 각도 임계값의 코사인 값
 };
 
 } // namespace range_image_clustering

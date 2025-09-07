@@ -64,10 +64,10 @@ private:
     marker.scale.z = roi_z_max_ - roi_z_min_;
     
     // ROI 박스 색상 (반투명 녹색)
-    marker.color.r = 0.0;
+    marker.color.r = 1.0;
     marker.color.g = 1.0;
     marker.color.b = 0.0;
-    marker.color.a = 0.3;  // 투명도
+    marker.color.a = 0.2;  // 투명도
     
     // 라이프타임 무한대
     marker.lifetime = rclcpp::Duration::from_seconds(0);

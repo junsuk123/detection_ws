@@ -32,11 +32,27 @@ def generate_launch_description():
             'debug_mode': True,
             'verbose_logging': True,
             
-            # 최적화된 설정 직접 적용
-            'range_image_width': 720,       # 해상도 조정
+            # 소형 객체 분리를 위한 최적화된 설정
+            'range_image_width': 720,       # 해상도 증가
             'range_image_height': 64, 
-            'angle_threshold': 0.15,
-            'min_cluster_size': 3
+            'angle_threshold': 0.07,        # 더 엄격한 각도 임계값
+            'distance_threshold': 0.03,     # 더 엄격한 거리 임계값 (3cm)
+            'min_cluster_size': 2,
+            
+            # 깊이 불연속 기반 클러스터링 강화
+            'depth_discontinuity_threshold': 0.08,
+            'adaptive_min_cluster_size': True,
+            'enable_acos_optimization': True,
+            
+            # 병합 비활성화로 소형 객체 보존
+            'merge_clusters': False,
+            'use_improved_merge_criteria': True,
+            'merge_box_expansion_factor': 1.03,
+            
+            # 소형 객체 추가 처리 활성화
+            'enable_small_object_refinement': True,
+            'small_object_max_volume': 0.01,
+            'min_object_separation': 0.05
         }],
         emulate_tty=True,
         prefix=['nice -n 10']
