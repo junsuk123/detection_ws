@@ -100,26 +100,31 @@ def generate_launch_description():
             # YOLO 트래커 노드 파라미터 설정
             yolo_params = {
                 'model_path': os.path.join(pkg_dir, 'models'),
-                'input_image_topic': f'{topic_prefix}/image_raw',
-                'camera_info_topic': f'{topic_prefix}/camera_info',
-                'yolo_result_topic': f'/detection/{camera_name}/yolo_result',
-                'yolo_result_image_topic': f'/detection/{camera_name}/yolo_result_image',
+                'input_image_topic': 'image_raw',
+                'camera_info_topic': 'camera_info',
+                'yolo_result_topic': 'yolo_result',
+                'yolo_result_image_topic': 'yolo_image',  # 상대 경로
                 'camera_name': camera_name
             }
-            
-            # YOLO 트래커 노드 생성
             yolo_node = Node(
                 package='ultralytics_ros',
                 executable='tracker_node.py',
-                name=node_name,
+                namespace=camera_name,
+                name='yolo_tracker',
                 output='screen',
                 parameters=[config_file, yolo_params],
                 remappings=[
-                    ('/detection/yolo_result', f'/detection/{camera_name}/yolo_result'),
-                    ('/detection/yolo_result_image', f'/detection/{camera_name}/yolo_result_image')
-                ]
+                    # 입력을 반드시 카메라 고유 토픽으로 고정
+                    ('/image_raw',  f'/{camera_name}/image_raw'),
+                    ('image_raw',   'image_raw'),
+                    ('/camera_info',f'/{camera_name}/camera_info'),
+                    ('camera_info', 'camera_info'),
+                    # 출력 이미지도 네임스페이스로 고정
+                    ('/yolo_image', 'yolo_image'),
+                ],
             )
-            
+
+
             yolo_nodes.append(yolo_node)
             launch_entities.append(yolo_node)
         
@@ -127,9 +132,16 @@ def generate_launch_description():
         tracker_params = {
             'active_cameras': active_cameras,
             'camera_count': len(active_cameras),
-            # 각 카메라의 YOLO 결과 토픽을 리스트로 저장
-            'yolo_result_topics': [f'/detection/{camera}/yolo_result' for camera in active_cameras],
-            'camera_info_topics': [f'/{camera}/camera_info' for camera in active_cameras]
+            'camera_info_topics': [f'/{c}/camera_info' for c in active_cameras],
+            'yolo_result_topics': [f'/{c}/yolo_result' for c in active_cameras],
+            # 여기를 반드시 지정 (예시: euclidean_cluster_gpu 노드의 출력)
+            'lidar_topic': '/pointcloud/clustered',
+            # 선택: 매칭 동작 튜닝 파라미터
+            'force_bbox': False,
+            'min_points_in_bbox': 4,
+            'min_ratio_in_cluster': 0.5,
+            'max_clusters_per_det': 2,
+            'exclusive_cluster': True,
         }
         
         # 3D 트래커 노드 생성
@@ -138,7 +150,8 @@ def generate_launch_description():
             executable='tracker_with_cloud_node',
             name='tracker_3d_node',
             output='screen',
-            parameters=[config_file, tracker_params]
+            parameters=[tracker_params],   # ← YAML 빼기!
+            arguments=['--ros-args', '--log-level', 'info'],
         )
         launch_entities.append(tracker_3d_node)
         

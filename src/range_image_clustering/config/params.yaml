@@ -14,10 +14,10 @@
     range_image_height: 64        # 센서 채널보다 높게 설정하여 보간 효과
     
     # 클러스터링 파라미터 - 소형 물체 분리용 미세 조정
-    angle_threshold: 0.07         # 각도 임계값 더 엄격하게 (4도 정도)
-    distance_threshold: 0.03      # 거리 임계값 감소 (3cm - 콘 간격의 1/3)
+    angle_threshold: 0.03         # 각도 임계값 더 엄격하게 (4도 정도)
+    distance_threshold: 0.01      # 거리 임계값 감소 (3cm - 콘 간격의 1/3)
     min_cluster_size: 2           # 최소 클러스터 크기는 유지
-    max_cluster_size: 200         # 최대 크기 제한 유지
+    max_cluster_size: 150         # 최대 크기 제한 유지
     
     # 근거리 클러스터링 최적화
     enable_adaptive_threshold: true
@@ -25,14 +25,14 @@
     max_adaptive_factor: 2.0         # 최대 적응 계수 감소
     
     # 깊이 불연속 기반 클러스터링 파라미터
-    depth_discontinuity_threshold: 0.08  # 더 엄격한 깊이 불연속 검출 (반으로 감소)
+    depth_discontinuity_threshold: 0.09  # 더 엄격한 깊이 불연속 검출 (반으로 감소)
     
     # 다단계 클러스터링 설정 - 소형 객체에 최적화
-    use_multi_level_clustering: false    # 깊이 불연속 기반 방식이 더 효과적
+    use_multi_level_clustering: true    # 깊이 불연속 기반 방식이 더 효과적
     
     # 클러스터 병합 설정 - 과도한 병합 방지
-    merge_clusters: true               # 소형 콘 분리를 위해 병합 비활성화
-    cluster_merge_threshold: 0.15       # 병합이 필요한 경우 임계값 감소
+    merge_clusters: false               # 소형 콘 분리를 위해 병합 비활성화
+    cluster_merge_threshold: 0.05       # 병합이 필요한 경우 임계값 감소
     use_improved_merge_criteria: true   
     merge_box_expansion_factor: 1.03    # 확장 계수 최소화 (거의 정확한 경계 박스 사용)
     
@@ -40,9 +40,9 @@
     evaluate_cluster_quality: false     # 소형 클러스터 보존을 위해 비활성화
     
     # 고급 분리 옵션 - 소형 객체에 최적화
-    enable_small_object_refinement: false  # 새 옵션: 소형 객체 추가 처리 활성화
-    small_object_max_volume: 0.01         # 새 옵션: 소형 객체 최대 부피 (0.01m³)
-    min_object_separation: 0.05           # 새 옵션: 최소 객체 분리 거리 (5cm)
+    enable_small_object_refinement: true  # 새 옵션: 소형 객체 추가 처리 활성화
+    small_object_max_volume: 0.05         # 새 옵션: 소형 객체 최대 부피 (0.01m³)
+    min_object_separation: 0.01           # 새 옵션: 최소 객체 분리 거리 (5cm)
 
     # 시각화 파라미터
     marker_lifetime: 0.2          # 마커 라이프타임 (초)
@@ -77,7 +77,7 @@
     max_cluster_elongation: 5.0
 
     # 클러스터 병합 설정
-    merge_clusters: true
+    merge_clusters: false
     cluster_merge_threshold: 0.3
     cluster_merge_angle: 0.5
     use_improved_merge_criteria: true    # 개선된 병합 기준 사용 (경계 상자 교차 검사)

@@ -62,16 +62,22 @@ private:
   rclcpp::Publisher<vision_msgs::msg::Detection3DArray>::SharedPtr detection3d_pub_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr detection_cloud_pub_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr marker_pub_;
-  image_geometry::PinholeCameraModel cam_model_;
-  message_filters::Subscriber<sensor_msgs::msg::CameraInfo> camera_info_sub_;
+  // 공통 LiDAR (clustered cloud) 구독자 1개
   message_filters::Subscriber<sensor_msgs::msg::PointCloud2> lidar_sub_;
-  message_filters::Subscriber<ultralytics_ros::msg::YoloResult> yolo_result_sub_;
-  std::shared_ptr<message_filters::Synchronizer<ApproximateSyncPolicy>> sync_;
+
+  // 카메라별 구독자/동기화기 (포인터로 보관: Subscriber는 default/move 불가)
+  std::vector<std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::CameraInfo>>> cam_info_subs_;
+  std::vector<std::shared_ptr<message_filters::Subscriber<ultralytics_ros::msg::YoloResult>>> yolo_subs_;
+  std::vector<std::shared_ptr<message_filters::Synchronizer<ApproximateSyncPolicy>>> syncs_;
+
+  // 다중 카메라 설정 파라미터
+  std::vector<std::string> active_cameras_;
+  std::vector<std::string> camera_info_topics_;
+  std::vector<std::string> yolo_result_topics_;
+
   std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
-  std::string camera_info_topic_;
   std::string lidar_topic_;
-  std::string yolo_result_topic_;
   std::string yolo_3d_result_topic_;
   float cluster_tolerance_;
   float voxel_leaf_size_;
@@ -80,9 +86,12 @@ private:
 
 public:
   TrackerWithCloudNode();
-  void syncCallback(const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info_msg,
-                    const sensor_msgs::msg::PointCloud2::ConstSharedPtr& cloud_msg,
-                    const ultralytics_ros::msg::YoloResult::ConstSharedPtr& yolo_result_msg);
+  // 단일/레거시용 콜백은 유지하되, 다중 카메라용 인덱스 콜백 추가
+  void syncCallbackN(size_t cam_idx,
+                     const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info_msg,
+                     const sensor_msgs::msg::PointCloud2::ConstSharedPtr& cloud_msg,
+                     const ultralytics_ros::msg::YoloResult::ConstSharedPtr& yolo_result_msg);
+
   void transformPointCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_in,
                            pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_out, const Eigen::Affine3f& transform);
   void projectCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,

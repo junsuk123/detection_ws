@@ -1,145 +1,97 @@
+# ─────────────────────────────────────────────────────────────
+# 공통(모든 노드) 기본값: YOLO 트래커 노드가 읽는 파라미터들
+# ─────────────────────────────────────────────────────────────
 /**:
   ros__parameters:
-    # =============================================================================
-    # 토픽 설정 (launch 파일에서 오버라이드 가능)
-    # =============================================================================
-    
-    # 입력 토픽들
-    input_topic: "/camera3/image_raw"               # YOLO 입력 이미지
-    camera_info_topic: "/camera3/camera_info"       # 카메라 정보
-    lidar_topic: "/pointcloud/clustered"            # 클러스터된 포인트클라우드
-    
-    # 출력 토픽들
-    result_topic: "/yolo_result"                    # YOLO 검출 결과
-    result_image_topic: "/yolo_image"               # 시각화된 결과 이미지
-    yolo_3d_result_topic: "/yolo_3d_result"         # 3D 바운딩박스 결과
+    # 입력 토픽(상대 경로)  ← 네임스페이스(/camera1, /camera3) 자동 적용
+    input_image_topic: "image_raw"      # 권장 키
+    input_topic: "image_raw"            # 기존 구현 호환 alias
+    camera_info_topic: "camera_info"
 
-    # =============================================================================
-    # YOLO 모델 설정
-    # =============================================================================
-    
-    # YOLO 모델 파일 경로
-    yolo_model: "best.pt"  # models 폴더 내 상대 경로
-    model_path: ""            # launch에서 자동 설정됨
-    
-    # YOLO 추론 파라미터
-    conf_thres: 0.2      # 신뢰도 임계값 (0.0-1.0, 낮을수록 더 많은 검출)
-    iou_thres: 0.45      # IoU 임계값 (0.0-1.0, 낮을수록 더 적은 중복 제거)
-    max_det: 300         # 최대 검출 개수
-    device: "cuda:0"     # 추론 디바이스 (cuda:0, cpu 등)
+    # 출력 토픽(상대 경로)
+    yolo_result_topic: "yolo_result"            # 권장 키
+    result_topic: "yolo_result"                 # alias
+    yolo_result_image_topic: "yolo_image"
+    result_image_topic: "yolo_image"            # alias
 
-    # =============================================================================
-    # 추적(Tracking) 설정
-    # =============================================================================
-    
-    # 추적기 설정 파일
+    # YOLO 모델/추론
+    yolo_model: "best.pt"        # models 폴더 상대 경로
+    model_path: ""               # launch에서 설정
+    conf_thres: 0.2
+    iou_thres: 0.45
+    max_det: 300
+    device: "cuda:0"
+
+    # 추적기
     tracker: "bytetrack.yaml"
-    
-    # 추적기 파라미터
-    track_high_thresh: 0.6    # 높은 신뢰도 임계값
-    track_low_thresh: 0.1     # 낮은 신뢰도 임계값
-    new_track_thresh: 0.7     # 새 트랙 생성 임계값
-    track_buffer: 30          # 트랙 버퍼 크기
-    match_thresh: 0.8         # 매칭 임계값
-    frame_rate: 30            # 프레임 레이트
+    track_high_thresh: 0.6
+    track_low_thresh: 0.1
+    new_track_thresh: 0.7
+    track_buffer: 30
+    match_thresh: 0.8
+    frame_rate: 30
 
-    # =============================================================================
-    # 시각화 설정 (launch 파일과 호환)
-    # =============================================================================
-    
-    # 바운딩 박스 강제 사용
-    force_bbox: true         # true: 마스크 무시하고 바운딩박스만 사용
-    
-    # 결과 이미지 시각화 옵션
-    result_conf: true         # 신뢰도 표시
-    result_labels: true       # 클래스 라벨 표시
-    result_boxes: true        # 바운딩 박스 표시
-    result_line_width: 1      # 선 두께
-    result_font_size: 1       # 폰트 크기
-    result_font: "Arial.ttf"  # 폰트 파일
+    # 시각화
+    force_bbox: true             # 마스크 무시하고 BBOX 사용(필요에 따라 false)
+    result_conf: true
+    result_labels: true
+    result_boxes: true
+    result_line_width: 1
+    result_font_size: 1
+    result_font: "Arial.ttf"
+    publish_debug_image: true    # ★ 결과 이미지 퍼블리시 보장
+    # 구현에 따라 쓰는 경우:
+    publish_image: true
+    # publish_debug_pointcloud: false
 
-    # =============================================================================
-    # 3D 프로젝션 파라미터 (launch 파일과 호환)
-    # =============================================================================
-    
-    # 클러스터링 파라미터 (기존 launch 파일 호환)
-    cluster_tolerance: 0.25   # 클러스터 허용 거리 [m]
-    voxel_leaf_size: 0.01     # 복셀 필터 크기 [m]
-    min_cluster_size: 5       # 최소 클러스터 크기
-    max_cluster_size: 500  # 최대 클러스터 크기
-    
-    # 추가 3D 처리 파라미터
-    use_reliable_lidar: false # true: 신뢰성 있는 LiDAR QoS 사용
-    min_points_in_bbox: 6    # 바운딩박스 내 최소 포인트 수
-    min_ratio_in_cluster: 0.3 # 클러스터 내 최소 비율
-    max_clusters_per_det: 50   # 검출당 최대 클러스터 수
-    exclusive_cluster: true   # 독점적 클러스터 할당
-    
-    # 거리 기반 필터링
-    min_detection_range: 1.0  # 최소 검출 거리 [m]
-    max_detection_range: 50.0 # 최대 검출 거리 [m]
-    
-    # 높이 필터링
-    min_height: -2.0         # 최소 높이 [m]
-    max_height: 3.0          # 최대 높이 [m]
+    # (일부는 트래커 경로에서 미사용이지만 유지)
+    cluster_tolerance: 0.25
+    voxel_leaf_size: 0.01
+    min_cluster_size: 5
+    max_cluster_size: 500
 
-    # =============================================================================
-    # 성능 최적화 설정
-    # =============================================================================
-    
-    # 처리 빈도 제어
-    processing_frequency: 10.0  # 3D 처리 빈도 [Hz]
-    skip_frame_count: 0        # 스킵할 프레임 수 (0: 모든 프레임 처리)
-    
-    # 메모리 관리
-    point_cloud_timeout: 1.0   # 포인트클라우드 타임아웃 [sec]
-    image_timeout: 0.1         # 이미지 타임아웃 [sec]
-    
-    # 동기화 설정
-    sync_slop: 0.05           # 동기화 허용 시간차 [sec]
-    queue_size: 10            # 메시지 큐 크기
+    # 거리/높이 필터
+    min_detection_range: 1.0
+    max_detection_range: 50.0
+    min_height: -2.0
+    max_height: 3.0
 
-    # =============================================================================
-    # 디버그 및 모니터링
-    # =============================================================================
-    
-    # 디버그 모드
-    debug_mode: true              # 디버그 정보 출력
-    publish_debug_pointcloud: false # 디버그 포인트클라우드 발행
-    publish_debug_image: false     # 디버그 이미지 발행
-    
-    # 성능 모니터링
-    publish_processing_time: true  # 처리 시간 정보 발행
-    log_performance: false         # 성능 로그 출력
+    # 성능/동기화(노드 구현에 따라 사용)
+    processing_frequency: 10.0
+    skip_frame_count: 0
+    point_cloud_timeout: 1.0
+    image_timeout: 0.1
+    sync_slop: 0.05
+    queue_size: 10
 
-# =============================================================================
-# 환경별 튜닝 가이드
-# =============================================================================
-#
-# 1. 실내 환경:
-#    - conf_thres: 0.2
-#    - min_points_in_bbox: 10
-#    - max_detection_range: 20.0
-#    - cluster_tolerance: 0.3
-#    - voxel_leaf_size: 0.005
-#
-# 2. 실외 환경:
-#    - conf_thres: 0.4
-#    - min_points_in_bbox: 30
-#    - max_detection_range: 100.0
-#    - cluster_tolerance: 0.8
-#    - voxel_leaf_size: 0.02
-#
-# 3. 고속 처리 우선:
-#    - processing_frequency: 5.0
-#    - skip_frame_count: 2
-#    - max_clusters_per_det: 1
-#    - debug_mode: false
-#    - voxel_leaf_size: 0.03
-#
-# 4. 정확도 우선:
-#    - conf_thres: 0.5
-#    - min_points_in_bbox: 50
-#    - max_clusters_per_det: 3
-#    - exclusive_cluster: false
-#    - voxel_leaf_size: 0.005
+    # 모니터링
+    debug_mode: true
+    publish_processing_time: true
+    log_performance: false
+
+# ─────────────────────────────────────────────────────────────
+# 3D 트래커 노드 전용 설정(노드명: tracker_3d_node)
+# ─────────────────────────────────────────────────────────────
+/tracker_3d_node:
+  ros__parameters:
+    # LiDAR(클러스터) 입력: 실제 발행되는 쪽으로 하나만 선택
+    # 예) euclidean_cluster_gpu 쓰면 아래 줄, range_image_clustering 쓰면 /pointcloud/clustered 로 바꾸세요.
+    lidar_topic: "/pointcloud/clustered"
+
+    # 3D 결과 출력(전역으로 1개면 절대 경로 유지 OK)
+    yolo_3d_result_topic: "/yolo_3d_result"
+
+    # QoS 맞추기: 퍼블리셔가 RELIABLE면 true, BEST_EFFORT면 false
+    use_reliable_lidar: false
+
+    # 다중 카메라(런치에서 덮어씀)
+    active_cameras: []
+    camera_info_topics: []      # 예: ["/camera1/camera_info", "/camera3/camera_info"]
+    yolo_result_topics: []      # 예: ["/camera1/yolo_result", "/camera3/yolo_result"]
+
+    # 매칭 파라미터
+    force_bbox: true            # 위 공통과 동일하게 유지
+    min_points_in_bbox: 20
+    min_ratio_in_cluster: 0.0
+    max_clusters_per_det: 2
+    exclusive_cluster: true

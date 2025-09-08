@@ -13,6 +13,8 @@
  */
 
 #include "tracker_with_cloud_node/tracker_with_cloud_node.h"
+#include <unordered_set>
+#include <algorithm>
 
 #include <sensor_msgs/point_cloud2_iterator.hpp>
 #include <unordered_map>
@@ -143,9 +145,13 @@ TrackerWithCloudNode::TrackerWithCloudNode() : rclcpp::Node("tracker_with_cloud_
 
   bool use_reliable_lidar = this->get_parameter("use_reliable_lidar").as_bool();
 
-  this->declare_parameter<std::string>("camera_info_topic", "camera_info");
+  // 다중 카메라용 배열 파라미터
+  this->declare_parameter<std::vector<std::string>>("active_cameras", {});
+  this->declare_parameter<std::vector<std::string>>("camera_info_topics", {});
+  this->declare_parameter<std::vector<std::string>>("yolo_result_topics", {});
+  // 공통 LiDAR
   this->declare_parameter<std::string>("lidar_topic", "points_raw");
-  this->declare_parameter<std::string>("yolo_result_topic", "yolo_result");
+
   this->declare_parameter<std::string>("yolo_3d_result_topic", "yolo_3d_result");
 
   // (아래 파라미터는 Option-B 경로에선 사용하지 않지만 유지)
@@ -154,27 +160,53 @@ TrackerWithCloudNode::TrackerWithCloudNode() : rclcpp::Node("tracker_with_cloud_
   this->declare_parameter<int>("min_cluster_size", 100);
   this->declare_parameter<int>("max_cluster_size", 25000);
 
-  // Read topics
-  this->get_parameter("camera_info_topic", camera_info_topic_);
+  // Read topics/arrays
+  this->get_parameter("active_cameras", active_cameras_);
+  this->get_parameter("camera_info_topics", camera_info_topics_);
+  this->get_parameter("yolo_result_topics", yolo_result_topics_);
   this->get_parameter("lidar_topic", lidar_topic_);
-  this->get_parameter("yolo_result_topic", yolo_result_topic_);
 
-  RCLCPP_INFO(get_logger(), "[INIT] subscribing: camera_info=%s lidar=%s yolo=%s",
-              camera_info_topic_.c_str(), lidar_topic_.c_str(), yolo_result_topic_.c_str());
+  // 배열 미지정 시, 단일 토픽(레거시) 지원
+  if (camera_info_topics_.empty() || yolo_result_topics_.empty()) {
+    std::string camera_info_topic = this->declare_parameter<std::string>("camera_info_topic", "camera_info");
+    std::string yolo_result_topic = this->declare_parameter<std::string>("yolo_result_topic", "yolo_result");
+    if (active_cameras_.empty()) active_cameras_.push_back("camera");
+    camera_info_topics_.push_back(camera_info_topic);
+    yolo_result_topics_.push_back(yolo_result_topic);
+  }
+
+  RCLCPP_INFO(get_logger(), "[INIT] lidar=%s cameras=%zu", lidar_topic_.c_str(), camera_info_topics_.size());
+  for (size_t i=0;i<camera_info_topics_.size();++i) {
+    RCLCPP_INFO(get_logger(), "  cam[%zu]: cam_info=%s  yolo=%s  name=%s",
+                i,
+                camera_info_topics_[i].c_str(),
+                yolo_result_topics_[i].c_str(),
+                (i<active_cameras_.size()? active_cameras_[i].c_str() : "(n/a)"));
+  }
 
   // ===== Subscribers & QoS =====
-  camera_info_sub_.subscribe(this, camera_info_topic_, rmw_qos_profile_sensor_data);
   if (use_reliable_lidar) {
     lidar_sub_.subscribe(this, lidar_topic_, rmw_qos_profile_default);          // Reliable
   } else {
     lidar_sub_.subscribe(this, lidar_topic_, rmw_qos_profile_sensor_data);      // BestEffort
   }
-  yolo_result_sub_.subscribe(this, yolo_result_topic_, rmw_qos_profile_sensor_data);
-  sync_ = std::make_shared<message_filters::Synchronizer<ApproximateSyncPolicy>>(30);
-  sync_->connectInput(camera_info_sub_, lidar_sub_, yolo_result_sub_);
-  sync_->setMaxIntervalDuration(rclcpp::Duration::from_seconds(1.0));
-  sync_->registerCallback(std::bind(&TrackerWithCloudNode::syncCallback, this, std::placeholders::_1,
-                                    std::placeholders::_2, std::placeholders::_3));
+  // 카메라 수만큼 구독자/동기화기 생성
+  const size_t N = camera_info_topics_.size();
+  cam_info_subs_.reserve(N);
+  yolo_subs_.reserve(N);
+  syncs_.reserve(N);
+  for (size_t i=0;i<N;++i) {
+    cam_info_subs_.push_back(std::make_shared<message_filters::Subscriber<sensor_msgs::msg::CameraInfo>>());
+    yolo_subs_.push_back(std::make_shared<message_filters::Subscriber<ultralytics_ros::msg::YoloResult>>());
+    cam_info_subs_[i]->subscribe(this, camera_info_topics_[i], rmw_qos_profile_sensor_data);
+    yolo_subs_[i]->subscribe(this, yolo_result_topics_[i], rmw_qos_profile_sensor_data);
+    syncs_.push_back(std::make_shared<message_filters::Synchronizer<ApproximateSyncPolicy>>(ApproximateSyncPolicy(30)));
+    // connectInput()는 참조를 받으므로 역참조해서 전달
+    syncs_[i]->connectInput(*cam_info_subs_[i], lidar_sub_, *yolo_subs_[i]);
+    syncs_[i]->setMaxIntervalDuration(rclcpp::Duration::from_seconds(1.0));
+    using std::placeholders::_1; using std::placeholders::_2; using std::placeholders::_3;
+    syncs_[i]->registerCallback(std::bind(&TrackerWithCloudNode::syncCallbackN, this, i, _1, _2, _3));
+  }
 
   // ===== Publishers =====
   this->get_parameter("yolo_3d_result_topic", yolo_3d_result_topic_);
@@ -190,20 +222,24 @@ TrackerWithCloudNode::TrackerWithCloudNode() : rclcpp::Node("tracker_with_cloud_
   tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 }
 
-void TrackerWithCloudNode::syncCallback(const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info_msg,
-                                        const sensor_msgs::msg::PointCloud2::ConstSharedPtr& cloud_msg,
-                                        const ultralytics_ros::msg::YoloResult::ConstSharedPtr& yolo_result_msg)
+void TrackerWithCloudNode::syncCallbackN(size_t cam_idx,
+                                         const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info_msg,
+                                         const sensor_msgs::msg::PointCloud2::ConstSharedPtr& cloud_msg,
+                                         const ultralytics_ros::msg::YoloResult::ConstSharedPtr& yolo_result_msg)
 {
   rclcpp::Time current_call_time = this->now();
   rclcpp::Duration callback_interval = current_call_time - last_call_time_;
   last_call_time_ = current_call_time;
+  const std::string cam_name = (cam_idx < active_cameras_.size()? active_cameras_[cam_idx] : ("cam_"+std::to_string(cam_idx)));
 
-  RCLCPP_INFO(get_logger(), "[CB] stamps: cloud=%.3f yolo=%.3f cam=%.3f (dt=%.3f)",
+  RCLCPP_INFO(get_logger(), "[CB][%s] stamps: cloud=%.3f yolo=%.3f cam=%.3f (dt=%.3f)",
+              cam_name.c_str(),
               rclcpp::Time(cloud_msg->header.stamp).seconds(),
               rclcpp::Time(yolo_result_msg->header.stamp).seconds(),
               rclcpp::Time(camera_info_msg->header.stamp).seconds(),
               callback_interval.seconds());
-  RCLCPP_INFO(get_logger(), "[CB] frames: cloud=%s cam_info_frame=%s",
+  RCLCPP_INFO(get_logger(), "[CB][%s] frames: cloud=%s cam_info_frame=%s",
+              cam_name.c_str(),
               cloud_msg->header.frame_id.c_str(), camera_info_msg->header.frame_id.c_str());
   RCLCPP_INFO(get_logger(), "[CB] cloud2: height=%u width=%u step=%u row_step=%u",
               cloud_msg->height, cloud_msg->width, cloud_msg->point_step, cloud_msg->row_step);
@@ -211,18 +247,31 @@ void TrackerWithCloudNode::syncCallback(const sensor_msgs::msg::CameraInfo::Cons
               yolo_result_msg->detections.detections.size(), yolo_result_msg->masks.size());
 
   // ===== Camera model =====
+  image_geometry::PinholeCameraModel cam_model;  // try 바깥에서 선언해 아래 범위에서도 사용
+
   try {
-    cam_model_.fromCameraInfo(camera_info_msg);
-    const cv::Size fr = cam_model_.fullResolution();
-    RCLCPP_INFO(get_logger(), "[CAM] fullResolution=%dx%d K=[fx=%.1f fy=%.1f cx=%.1f cy=%.1f] tfFrame='%s'",
+    cam_model.fromCameraInfo(camera_info_msg);
+    const cv::Size fr = cam_model.fullResolution();
+    RCLCPP_INFO(get_logger(), "[CAM][%s] fullRes=%dx%d K=[fx=%.1f fy=%.1f cx=%.1f cy=%.1f] tfFrame='%s'",
+                cam_name.c_str(),
                 fr.width, fr.height,
-                cam_model_.fx(), cam_model_.fy(), cam_model_.cx(), cam_model_.cy(),
-                cam_model_.tfFrame().c_str());
-    if (cam_model_.tfFrame().empty()) {
-      RCLCPP_WARN(get_logger(), "[CAM] cam_model.tfFrame() is empty. Will use camera_info frame: %s",
+                cam_model.fx(), cam_model.fy(), cam_model.cx(), cam_model.cy(),
+                cam_model.tfFrame().c_str());
+    if (cam_model.tfFrame().empty()) {
+      RCLCPP_WARN(get_logger(), "[CAM][%s] cam_model.tfFrame() empty → use camera_info frame: %s",
+                  cam_name.c_str(),
                   camera_info_msg->header.frame_id.c_str());
     }
-  } catch (const std::exception &e) {
+    // ↓↓↓↓↓ 기존 본문에서 cam_model_ → cam_model 로 바꿔 사용 ↓↓↓↓↓
+    // (아래 코드는 기존 로직 그대로 유지)
+    // ===== Read x,y,z,cid =====
+    // ... 동일 ...
+    const std::string target_frame = cam_model.tfFrame().empty()
+                                     ? camera_info_msg->header.frame_id : cam_model.tfFrame();
+    // ... TF lookup 동일 ...
+    // transformLidarToCam(...), projectToPixel(cam_model, ...) 등에서 cam_model 사용
+    // 로그들에 [cam_name] 접두를 추가하면 디버깅이 편합니다.
+  } catch (const std::exception &e) {    
     RCLCPP_ERROR(get_logger(), "[CAM] fromCameraInfo failed: %s", e.what());
     return;
   }
@@ -239,8 +288,9 @@ void TrackerWithCloudNode::syncCallback(const sensor_msgs::msg::CameraInfo::Cons
   }
 
   // ===== Transform points to camera frame (for projection) =====
-  const std::string target_frame = cam_model_.tfFrame().empty()
-                                   ? camera_info_msg->header.frame_id : cam_model_.tfFrame();
+  const std::string target_frame = cam_model.tfFrame().empty()
+                                   ? camera_info_msg->header.frame_id : cam_model.tfFrame();
+
 
   geometry_msgs::msg::TransformStamped tf_stamped;
   try {
@@ -260,11 +310,11 @@ void TrackerWithCloudNode::syncCallback(const sensor_msgs::msg::CameraInfo::Cons
   transformLidarToCam(pts_lidar, pts_cam, T);
 
   // 한 번만 투영
-  const cv::Size fr = cam_model_.fullResolution();
+  const cv::Size fr = cam_model.fullResolution();
   size_t behind = 0;
   for (auto &p : pts_cam) {
     if (p.z <= 0 || !std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z)) { behind++; continue; }
-    int u, v; if (projectToPixel(cam_model_, p.x, p.y, p.z, u, v)) { p.u=u; p.v=v; }
+    int u, v; if (projectToPixel(cam_model, p.x, p.y, p.z, u, v)) { p.u=u; p.v=v; }
   }
   RCLCPP_INFO(get_logger(), "[PROJ] projected=%zu / %zu (behind=%zu)",
               pts_cam.size() - behind, pts_cam.size(), behind);
